@@ -182,9 +182,47 @@ def random_history(T, N, rng, bonus_n):
     W = [sorted(rng.choice(N, 5, replace=False) + 1) for _ in range(T)]
     return W, [int(rng.integers(1, bonus_n + 1)) for _ in range(T)]
 
+def sync_long(game, data_dir):
+    """Merge the auto-updated data/<game>_draws.csv into data/long_<game>.csv. Returns number of draws added."""
+    import csv
+    p = os.path.join(data_dir, f"long_{game}.csv"); cur = {r["date"]: r for r in csv.DictReader(open(p))}
+    n0 = len(cur); src = os.path.join(data_dir, f"{game}_draws.csv")
+    if os.path.exists(src):
+        for r in csv.DictReader(open(src)):
+            cur.setdefault(r["date"], {"date": r["date"], **{f"n{i}": r[f"n{i}"] for i in range(1, 6)}, "bonus": r["bonus"]})
+    with open(p, "w", newline="") as fh:
+        w = csv.writer(fh); w.writerow(["date", "n1", "n2", "n3", "n4", "n5", "bonus"])
+        for d in sorted(cur): w.writerow([d] + [cur[d][f"n{i}"] for i in range(1, 6)] + [cur[d]["bonus"]])
+    return len(cur) - n0
+
+def next_picks(game, data_dir, target=None, look=400):
+    """Fused picks for the next draw (equal vote of all 42 experts, and the track-record-weighted version) + evidence line."""
+    import lotto_predictor as L
+    N = WHITES[game]; other = "megamillions" if game == "powerball" else "powerball"
+    dates, W, B = load_long(game, data_dir); od, oW, _ = load_long(other, data_dir)
+    target = target or L.next_draw_date(game, L.default_start())
+    d2, W2, B2 = dates + [target], W + [[1, 2, 3, 4, 5]], B + [B[-1]]
+    X = to_X(W2, N); g1, g3 = other_game_matrix(d2, od, oW, N); T = len(X)
+    names, S = build_experts(X, B2, d2, g1, g3, 60); Z = zscore(S)
+    Xr = X[:-1]; A = np.array([auc_rows(Z[60:T - 1, e, :], Xr[60:]) for e in range(len(names))]).T
+    eq = Z[T - 1].mean(0); look = min(look, T - 61)
+    z_eq = (auc_rows(Z[T - 1 - look:T - 1].mean(1), Xr[-look:]).mean() - .5) / (AUC_SD / math.sqrt(look))
+    zrun = (np.nanmean(A, 0) - .5) / (AUC_SD / math.sqrt(len(A))); w = np.sign(zrun) * np.maximum(0, np.abs(zrun) - 1.0)
+    wz = np.tensordot(w, Z[T - 1], axes=(0, 0))
+    top = lambda v: sorted(int(i) + 1 for i in np.argsort(-v, kind="stable")[:5])
+    return target, top(eq), top(wz), float(z_eq), int((w != 0).sum())
+
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("game", choices=list(WHITES)); ap.add_argument("--nulls", type=int, default=2)
+    ap.add_argument("--sync-long", action="store_true", help="merge newly downloaded draws into the long-history file")
+    ap.add_argument("--picks", action="store_true", help="print fused picks + evidence for the next draw and exit")
     ap.add_argument("--data-dir", default="data"); ap.add_argument("--out", default="output"); a = ap.parse_args()
+    if a.sync_long: print(f"[{a.game}] long history: added {sync_long(a.game, a.data_dir)} new draw(s)")
+    if a.picks:
+        tgt, eq, wz, z, nw = next_picks(a.game, a.data_dir)
+        print(f"FUSION {a.game} for {tgt}: equal-vote {' '.join(f'{x:02d}' for x in eq)} | track-record-weighted {' '.join(f'{x:02d}' for x in wz)} "
+              f"| evidence: equal-vote skill over last 400 draws z={z:+.1f} (needs z>3.5 to mean anything), {nw} experts currently trusted")
+        return
     N = WHITES[a.game]; other = "megamillions" if a.game == "powerball" else "powerball"
     dates, W, B = load_long(a.game, a.data_dir); od, oW, _ = load_long(other, a.data_dir)
     X = to_X(W, N); g1, g3 = other_game_matrix(dates, od, oW, N); T = len(dates)
