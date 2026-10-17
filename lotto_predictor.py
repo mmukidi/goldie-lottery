@@ -658,6 +658,7 @@ def main(argv=None):
     ap.add_argument("--remind", action="store_true", help="only act if a draw is TOMORROW (ET); print a short reminder with the guesses")
     ap.add_argument("--ingest", nargs=2, action="append", metavar=("GAME", "FILE"),
                     help="add draws from a text/JSON file (use with --no-update when the feed is unreachable)")
+    ap.add_argument("--study", nargs=2, type=int, metavar=("TRAIN_YEAR", "TEST_YEAR"), help="train on one year, test on another (writes <game>_study_*.xlsx)")
     ap.add_argument("--no-workbook", action="store_true", help="do not write the Excel workbook")
     a = ap.parse_args(argv)
     games = list(GAMES) if a.game == "both" else [a.game]
@@ -686,6 +687,10 @@ def main(argv=None):
             print(f"  {'Theoretical random':34s} {25 / cfg['whites']:8.3f}   {100 / cfg['bonus']:7.1f}%")
         return 0
 
+    if a.study:
+        import lotto_study
+        for g in games: lotto_study.run(g, all_draws[g], a.days, a.study[0], a.study[1], a.out, a.data_dir)
+        return 0
     if a.review is not None:
         for g in games: review(g, all_draws[g], a.days, a.review)
         return 0
@@ -769,7 +774,7 @@ def main(argv=None):
         print("\n" + msg)
         with open(os.path.join(a.out, "reminder.txt"), "w") as f: f.write(msg + "\n")
     if preds and not a.no_workbook:
-        path = os.path.join(a.out, "lottery_workbook.xlsx")
+        path = os.path.join(a.out, f"{games[0]}_workbook.xlsx" if len(games) == 1 else "lottery_workbook.xlsx")
         if write_workbook(path, {g: all_draws[g] for g in preds}, preds, [s for s in scored if s["game"] in preds],
                           a.days, window_start):
             print(f"\nWorkbook written: {path}")
