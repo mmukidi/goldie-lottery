@@ -9,12 +9,14 @@ def draw_ts(game, d):
     cfg = L.GAMES[game]; hh, mm = (22, 59) if game == "powerball" else (23, 0)
     return dt.datetime(d.year, d.month, d.day, hh, mm, tzinfo=ZoneInfo("America/New_York")).isoformat()
 
-def build(data_dir, fusion=True, days=365):
+def build(data_dir, fusion=True, days=365, last=50):
     games, numbers, recent = [], [], []
     start = L.default_start()
     for g, cfg in L.GAMES.items():
         draws = L.load_draws(g, data_dir); target = L.next_draw_date(g, start)
         H, wstart = L.history_for(draws, target, days, cfg)
+        if last:   # newest first: keep only the most recent `last` draws
+            H = H[:last]; wstart = [d for d, w, b in draws if wstart <= d < target][:last][-1]
         N, NB = cfg["whites"], cfg["bonus"]
         picks = {}
         for name, f in L.STRATEGIES:
@@ -52,7 +54,7 @@ def build(data_dir, fusion=True, days=365):
                 tot = sum(flags); hits20 = sum(flags[:20]); hits50 = sum(flags[:50])
                 numbers.append(dict(game=g, kind=kind, number=n, hits20=hits20, hits50=hits50, hits_all=tot, exp20=round(20 * expn / pool, 2), exp50=round(50 * expn / pool, 2),
                                     exp_all=round(len(flags) * expn / pool, 1), since_last=first, avg_gap=round(len(flags) / tot, 1) if tot else None,
-                                    z_freq=round(z1[n], 2), z_due=round(z2[n], 2), z_hot=round(z3[n], 2), strip="".join(map(str, flags[:20])),
+                                    z_freq=round(z1[n], 2), z_due=round(z2[n], 2), z_hot=round(z3[n], 2), strip="".join(map(str, flags[:50])),
                                     picked=int((kind == "white" and n in main) or (kind == "bonus" and n == mb)), fusion_pick=int(kind == "white" and n in fus),
                                     strategies=alt.get((kind, n), 0)))
         for d, w, b in draws[:14]:
@@ -60,8 +62,8 @@ def build(data_dir, fusion=True, days=365):
     return games, numbers, recent
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(); ap.add_argument("--data-dir", default="data"); ap.add_argument("--out", default="output/dash"); ap.add_argument("--no-fusion", action="store_true"); a = ap.parse_args()
-    games, numbers, recent = build(a.data_dir, not a.no_fusion); os.makedirs(a.out, exist_ok=True)
+    ap = argparse.ArgumentParser(); ap.add_argument("--data-dir", default="data"); ap.add_argument("--out", default="output/dash"); ap.add_argument("--no-fusion", action="store_true"); ap.add_argument("--last", type=int, default=50); a = ap.parse_args()
+    games, numbers, recent = build(a.data_dir, not a.no_fusion, last=a.last); os.makedirs(a.out, exist_ok=True)
     for nm, rows in (("games", games), ("numbers", numbers), ("draws", recent)):
         json.dump(rows, open(os.path.join(a.out, nm + ".json"), "w"), separators=(",", ":"))
     print(f"wrote {len(games)} games, {len(numbers)} numbers, {len(recent)} recent draws to {a.out}")
