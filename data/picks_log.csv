@@ -1,0 +1,11 @@
+game,target_date,strategy,whites,bonus,generated_at
+powerball,2026-10-17,Formula (frequency + due + hot),3 14 58 64 65,14,2026-10-16T22:53:29
+powerball,2026-10-17,Balanced profile,3 18 28 58 65,14,2026-10-16T22:53:29
+powerball,2026-10-17,Overdue gaps,8 27 43 48 60,21,2026-10-16T22:53:29
+powerball,2026-10-17,Hot streak (fast decay),4 21 33 42 51,9,2026-10-16T22:53:29
+powerball,2026-10-17,Pair affinity,3 28 36 57 58,2,2026-10-16T22:53:29
+megamillions,2026-10-20,Formula (frequency + due + hot),26 30 34 51 59,12,2026-10-16T22:53:29
+megamillions,2026-10-20,Balanced profile,11 30 34 43 59,12,2026-10-16T22:53:29
+megamillions,2026-10-20,Overdue gaps,18 28 31 52 69,18,2026-10-16T22:53:29
+megamillions,2026-10-20,Hot streak (fast decay),7 15 26 40 68,17,2026-10-16T22:53:29
+megamillions,2026-10-20,Pair affinity,5 30 34 49 59,12,2026-10-16T22:53:29
